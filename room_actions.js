@@ -6,11 +6,12 @@ const RoomActions={
   return (instructions[station.type]||'Press E to use this station.')+' '+effect+(station.used&&!station.repeat?' Already serviced.':'');
  },
  use(station){if(station.used&&!station.repeat){this.notice('ALREADY SERVICED',station.label,station.effect==='archive'?'The archive files have already been downloaded. Return to the service lift when your mission is complete.':'This station has already been collected or serviced. '+this.describe(station));return}if(station.requires!==undefined&&!world.stations.find(s=>s.id===station.requires)?.used){this.notice('MISSION PREREQUISITE',station.label,'First retrieve '+world.stations.find(s=>s.id===station.requires).label.toLowerCase()+'.');return}if(station.effect==='archive'&&!firewall){this.notice('FIREWALL LOCKED',station.label,'The encrypted archive is locked. Find POWER CONTROL and complete its breaker puzzle to override the firewall. Then return here and press E to download the files. The cyan card opens the archive door; it does not bypass this firewall.');return}if(station.type){this.puzzle(station);return}const description=this.describe(station);this.reward(station);this.notice('EQUIPMENT ACQUIRED',station.label,description)},
+ timeLimit(station){return (station.type==='route'?40:station.type==='breaker'?26:30)+(toolUpgrade?10:0)},
  notice(tag,title,text){mode='inspect';modal(tag,title,text);this.continueButton()},
  continueButton(){const close=document.createElement('button');close.textContent='Continue';close.onclick=()=>{dialog.close();mode='play'};$('modalBody').append(close)},
  puzzle(station){
   if(!station)return;if(station.used&&!station.repeat){log(station.label+' / already serviced.');return}
-  mode='hack';AudioFX.cue('hack');hackDeadline=clock+(station.type==='route'?40:station.type==='breaker'?26:30)+(toolUpgrade?10:0);const token=run;
+  mode='hack';AudioFX.cue('hack');hackDeadline=clock+this.timeLimit(station);const token=run;
   modal('LIVE '+(station.type==='drawers'?'SEARCH':'BREACH')+' / SECURITY STILL MOVING',station.label,this.describe(station));
   MiniGames.start({type:station.type,seed:world.seed+':'+station.id,parent:$('modalBody'),alive:()=>run===token&&mode==='hack',onwin:()=>{if(run!==token||mode!=='hack')return;dialog.close();mode='play';this.reward(station)},onfail:()=>{if(run!==token||mode!=='hack')return;dialog.close();mode='play';severity=2;evidence='A failed circuit override left tampering evidence';makeNoise(p,20);world.guards.forEach(g=>g.meter=Math.max(g.meter,.35));log('Circuit tripped. Security heard the short. Move behind cover.')}});
   const cancel=document.createElement('button');cancel.textContent='Disconnect';cancel.onclick=()=>{MiniGames.stop();dialog.close();mode='play'};$('modalBody').append(cancel);

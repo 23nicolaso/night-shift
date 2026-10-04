@@ -10,7 +10,7 @@ try:
   page=browser.new_page(viewport={'width':1440,'height':1080})
   errors=[]
   page.on('pageerror',lambda error:errors.append(str(error)))
-  page.add_init_script("window.voiceCalls=[];window.voiceCancels=0;Object.defineProperty(window,'speechSynthesis',{value:{speak(u){voiceCalls.push(u.text)},cancel(){voiceCancels++}}})")
+  page.add_init_script("localStorage.setItem('night-shift-tutorial-seen','1');window.voiceCalls=[];window.voiceCancels=0;Object.defineProperty(window,'speechSynthesis',{value:{speak(u){voiceCalls.push(u.text)},cancel(){voiceCancels++}}})")
   page.goto(f'http://127.0.0.1:{host.server_port}')
   page.locator('#briefing').wait_for(state='visible')
   assert page.evaluate("mode==='briefing' && getComputedStyle(document.getElementById('briefing')).animationName==='briefingFade'")

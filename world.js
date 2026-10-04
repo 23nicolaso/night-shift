@@ -9,7 +9,7 @@ function generate(seed){
  const types=['office','records','server','lounge','workshop','office','records','lounge','server','workshop','office','records'];
  const specs=Array.from({length:count},()=>({w:6+Math.floor(random()*6),h:5+Math.floor(random()*5)}));
  const widths=Array.from({length:cols},(_,col)=>Math.max(...specs.filter((_,i)=>Math.floor(i/2)%cols===col).map(s=>s.w))+5),xs=widths.map((_,i)=>5+widths.slice(0,i).reduce((a,b)=>a+b,0)),w=widths.reduce((a,b)=>a+b,0)+10;
- const radii=Array.from({length:bands},()=>1+Math.floor(random()*2)),lanes=[];let bottom=3;
+ const radii=Array.from({length:bands},()=>2+Math.floor(random()*2)),lanes=[];let bottom=3;
  for(let band=0;band<bands;band++){const group=specs.slice(band*perBand,(band+1)*perBand),topDepth=Math.max(...group.filter((_,i)=>i%2===0).map(s=>s.h)),base=bottom+topDepth+radii[band]+5,wave=random()<.5?-1:1;lanes.push(Array.from({length:cols},(_,col)=>base+(col%2?-wave:wave)*(1+Math.floor(random()*3))));bottom=Math.max(...lanes[band])+radii[band]+2+Math.max(...group.filter((_,i)=>i%2===1).map(s=>s.h))+3}
  const centers=xs.map((x,col)=>x+Math.floor(widths[col]/2)),laneAt=(band,x)=>{if(x<=centers[0])return lanes[band][0];for(let col=1;col<cols;col++)if(x<=centers[col]){const ratio=(x-centers[col-1])/(centers[col]-centers[col-1]);return lanes[band][col-1]+ratio*(lanes[band][col]-lanes[band][col-1])}return lanes[band][cols-1]};
  const h=bottom+3,grid=Array.from({length:h},()=>Array(w).fill(0));
@@ -52,6 +52,24 @@ function generate(seed){
   const camera={x:cameraX+.5,y:obstacle.y+.5,angle:0,baseAngle:0,phase:random()*6.28,meter:0,disabledUntil:0,corridor:true};
   if(grid[obstacle.y][obstacle.x]!==1||grid[obstacle.y][obstacle.x+1]!==1||grid[obstacle.y][cameraX]!==1)continue;
   grid[obstacle.y][obstacle.x]=3;world.cover.push(obstacle);camera.safeSpot={x:obstacle.x+1.5,y:obstacle.y+.5};world.cameras.push(camera);
+ }
+ // Hide-behind crates: set one row in from a hallway wall, leaving a pocket behind them and the lane centre clear.
+ // A crate is kept only if the hallway floor stays one connected piece; door stubs and corridor cameras get a margin.
+ const hallConnected=()=>{const floor=[...hallway].filter(k=>{const[x,y]=k.split(',').map(Number);return grid[y][x]!==3}),open=new Set(floor),seen=new Set([floor[0]]),queue=[floor[0]];for(let i=0;i<queue.length;i++){const[x,y]=queue[i].split(',').map(Number);for(const[dx,dy]of dirs){const next=(x+dx)+','+(y+dy);if(open.has(next)&&!seen.has(next)){seen.add(next);queue.push(next)}}}return seen.size===open.size};
+ for(let band=0;band<bands;band++){
+  let side=random()<.5?-1:1;
+  for(let x=7+Math.floor(random()*4);x<w-9;x+=5+Math.floor(random()*4)){
+   const lane=Math.round(laneAt(band,x));
+   for(const trySide of[side,-side]){
+    const y=lane+trySide*(radii[band]-1),tiles=[[x,y],[x+1,y]];
+    const fits=tiles.every(([tx,ty])=>grid[ty]?.[tx]===1&&hallway.has(tx+','+ty)&&hallway.has(tx+','+(ty+trySide))&&hallway.has(tx+','+(ty-trySide)));
+    const clear=!rooms.some(r=>r.band===band&&Math.sign(r.doors[0].y-lane)===trySide&&Math.abs(Math.floor(r.doors[0].x)-x-.5)<3)&&!world.cover.some(o=>x<o.x+o.w+2&&x+2>o.x-2&&y<o.y+o.h+2&&y+1>o.y-2)&&!world.cameras.some(c=>Math.hypot(c.x-x-1,c.y-y-.5)<3);
+    if(!fits||!clear)continue;
+    tiles.forEach(([tx,ty])=>grid[ty][tx]=3);
+    if(!hallConnected()){tiles.forEach(([tx,ty])=>grid[ty][tx]=1);continue}
+    world.cover.push({x,y,w:2,h:1,kind:'crate',hall:true});side=-trySide;break;
+   }
+  }
  }
  for(const r of choices.slice(3,6)){const entry=r.doors[0];if(!entry)continue;world.lasers.push({...entry,phase:random()*5,period:5,onTime:2.8})}
  world.edges=edges;

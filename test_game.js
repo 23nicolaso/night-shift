@@ -1,7 +1,7 @@
 // Headless runtime smoke: real game logic with a minimal DOM/canvas adapter.
 const vm=require('node:vm'),fs=require('node:fs'),assert=require('node:assert/strict');
 class Element{constructor(){this.children=[];this.style={};this.classList={remove(){},add(){}};this.value='';this.open=false}append(...items){this.children.push(...items)}replaceChildren(){this.children=[]}showModal(){this.open=true}close(){this.open=false}addEventListener(){}focus(){}getContext(){return new Proxy({},{get:()=>()=>{}})}}
-const elements=new Map(),context={console,Math,Set,AbortSignal,setTimeout(){},document:{getElementById(id){if(!elements.has(id))elements.set(id,new Element());return elements.get(id)},createElement(){return new Element()}},window:{addEventListener(){}},requestAnimationFrame(){},fetch:async()=>({ok:true,json:async()=>({engine:'test',ready:false,choice:'release'})})};vm.createContext(context);for(const f of['world.js','textures.js','art.js','security.js','audio.js','puzzles.js','minigames.js','room_actions.js','game.js'])vm.runInContext(fs.readFileSync(f,'utf8'),context);
+const elements=new Map(),context={console,Math,Set,AbortSignal,setTimeout(){},document:{getElementById(id){if(!elements.has(id))elements.set(id,new Element());return elements.get(id)},createElement(){return new Element()}},window:{addEventListener(){}},requestAnimationFrame(){},fetch:async()=>({ok:true,json:async()=>({engine:'test',ready:false,choice:'release'})})};vm.createContext(context);for(const f of['world.js','textures.js','art.js','security.js','audio.js','puzzles.js','minigames.js','room_actions.js','tutorial.js','game.js'])vm.runInContext(fs.readFileSync(f,'utf8'),context);
 vm.runInContext(`const originalReset=reset;reset=(seed)=>{originalReset(seed,false);world.missionType='archive';world.missionSteps=['card','power','archive'];hud()};`,context);
 vm.runInContext(`reset('smoke');draw();update(.016);p={...world.card};interact();if(!card)throw Error('card pickup failed');p={...world.target};interact();if(mode!=='inspect'||!$('modalText').textContent.includes('POWER CONTROL'))throw Error('archive lock feedback missing');dialog.close();mode='play';firewall=true;interact();if(mode!=='hack')throw Error('hacking did not open');`,context);
 vm.runInContext(`const cables=MiniGames.active.state;for(let i=0;i<4;i++){Puzzles.cable(cables,i,cables.order.indexOf(i));MiniGames.check()}`,context);
@@ -17,7 +17,7 @@ for(let seed=0;seed<100;seed++){
  if(!missionComplete())throw Error('objectives did not complete');p={...world.start};interact();if(mode!=='end')throw Error('mission extraction failed');
 }
 if(missionTypes.size!==7)throw Error('missing mission variety');
-originalReset('briefing-test');if(mode!=='briefing')throw Error('briefing missing');const pausedClock=clock;update(2);if(clock!==pausedClock)throw Error('security advanced during briefing');Briefing.begin();if(mode!=='play'||!$('briefing').hidden)throw Error('briefing did not dismiss');
+originalReset('briefing-test');if(mode!=='briefing')throw Error('briefing missing');const pausedClock=clock;update(2);if(clock!==pausedClock)throw Error('security advanced during briefing');Briefing.begin();if(mode!=='tutorial'||!$('briefing').hidden)throw Error('briefing did not hand off to first-run training');Tutorial.skip();if(mode!=='play')throw Error('training skip did not start play');
 `,context);console.log('PASS: seven mission types over 100 seeds, reachable objectives, completion/extraction gates and paused briefing.');
 vm.runInContext(`
 for(let seed=0;seed<20;seed++){
@@ -84,3 +84,40 @@ for(let seed=0;seed<200&&tested.size<7;seed++){
 }
 if(tested.size!==7)throw Error('mission types untested');let previous=world.missionType;for(let i=0;i<20;i++){originalReset(undefined,false);if(world.missionType===previous)throw Error('new assignment repeated type');previous=world.missionType}
 `,context);console.log('PASS: all seven mission types complete through actual interactions and puzzle callbacks; prerequisites and consecutive assignment variety enforced.');
+vm.runInContext(`{
+// First-run training: paused cards, one per objective (or one list card), key lighting, replay, and the live guide.
+Tutorial.alwaysShow=false;Tutorial.shownThisSession=false;originalReset('training',true);Briefing.begin();
+if(mode!=='tutorial')throw Error('training did not start');const frozen=clock;update(3);if(clock!==frozen)throw Error('security advanced during training');
+const directory=Tutorial.directory();if(!directory||directory.label!=='FLOOR DIRECTORY')throw Error('lift room directory missing');
+if(Tutorial.steps.length!==world.missionSteps.length+5)throw Error('expected controls, directory, lift, one card per objective, threats and ready cards');
+if(!Tutorial.steps[1].spot.includes(directory))throw Error('directory is not spotlit');
+for(const step of world.missionSteps){const o=Tutorial.objective(step);if(!o.how||!o.where||!o.summary)throw Error('objective card incomplete: '+step)}
+Tutorial.render();Tutorial.key({key:'Shift'});Tutorial.key({key:'ArrowUp'});if(!Tutorial.pressed.has('shift')||!Tutorial.pressed.has('w'))throw Error('key lighting missed presses');
+Tutorial.key({key:'e'});if(card||badge||mode!=='tutorial')throw Error('E acted on the world during training');
+Tutorial.objectiveLayout='list';Tutorial.start();if(Tutorial.steps.length!==6||Tutorial.steps.filter(s=>s.list).length!==1)throw Error('list layout should hold every objective on one card');Tutorial.objectiveLayout='cards';
+Tutorial.start();while(mode==='tutorial')Tutorial.next();if(mode!=='play'||Tutorial.guide?.stage!=='directory')throw Error('training did not hand off to the live directory guide');
+// Indicators: the directory is marked, gets the [E] focus in reach, and loses its marker once used.
+if(!interactableMarks().some(m=>m.o===directory))throw Error('directory not marked');
+p={x:world.start.x+.2,y:world.start.y,angle:0};update(.016);if(reachTarget()!==world.start||!$('hint').textContent.includes('Service lift'))throw Error('prompt and E disagree between lift and directory');p={x:directory.x-.6,y:directory.y,angle:0};update(.016);if(reachTarget()!==directory||!$('hint').textContent.includes('FLOOR DIRECTORY'))throw Error('directory not focused in reach: '+JSON.stringify({d:[directory.x,directory.y],start:world.start,t:reachTarget(),hint:$('hint').textContent,mode,solid:solid(p.x,p.y)}));
+interact();dialog.close();mode='play';draw();if(interactableMarks().some(m=>m.o===directory))throw Error('used directory still marked');if(Tutorial.guide?.stage!=='scan')throw Error('guide did not advance after using the directory');
+const goals=interactableMarks().filter(m=>m.goal).map(m=>m.o);for(const step of world.missionSteps)if(!missionStepDone(step)&&!goals.includes(missionPoint(step)))throw Error('objective missing amber marker: '+step);
+Tutorial.stop();originalReset('training',true);Briefing.begin();if(mode!=='play')throw Error('training repeated within a session');
+}`,context);console.log('PASS: first-run training pauses security, covers controls, the lift-room directory, each objective and threats; markers and the [E] reach cue track interactables.');
+vm.runInContext(`{
+// Hands-on E practice: walk (lift room only, security frozen), press E at the directory, then continue.
+Tutorial.shownThisSession=false;originalReset('practice',true);Briefing.begin();Tutorial.next();const d=Tutorial.directory(),frozen=clock;
+if(!Tutorial.practicing())throw Error('directory card is not a practice step');Tutorial.animate(1.5);
+p={x:world.start.x,y:world.start.y,angle:0};Tutorial.key({key:'e'});if(d.used||!Tutorial.nudge)throw Error('E away from the directory should only nudge');
+keys.add('d');for(let i=0;i<40;i++)update(.05);keys.clear();if(p.x<=world.start.x)throw Error('could not walk during practice');if(World.roomAt(world,p)?.id!==Tutorial.lobby().id)throw Error('left the lift room during practice');
+p={x:d.x-.6,y:d.y,angle:0};Tutorial.key({key:'e'});if(!d.used||!directoryKnown||mode!=='tutorial')throw Error('practice E did not scan the directory');if(clock!==frozen)throw Error('security advanced during practice');
+keys.add('a');for(let i=0;i<400;i++)update(.05);keys.clear();if(World.roomAt(world,p)?.id!==Tutorial.lobby().id)throw Error('walked out of the lift room');
+while(mode==='tutorial')Tutorial.next();if(Tutorial.guide?.stage!=='scan')throw Error('guide should skip to R after practice');
+}`,context);console.log('PASS: E is practised at the floor directory with security frozen and movement confined to the lift room.');
+vm.runInContext(`{
+// Room privacy: a hallway guard cannot see into a room, but a guard that spotted you in the hallway follows you in.
+const setup=()=>{originalReset('privacy',false);mode='play';world.cameras=[];world.lasers=[];const r=world.rooms.find(r=>!r.restricted&&r.type!=='lobby'),d=r.doors[0],at=k=>({x:d.x+d.dx*k,y:d.y+d.dy*k}),k=[4,3,2].find(k=>!solid(at(k).x,at(k).y));const g={...at(k),angle:Math.atan2(-d.dy,-d.dx),meter:0,cool:0,pause:0,route:[],routeIndex:0,patrolSeed:5,search:0,lastSeen:null};world.guards=[g];return{r,d,g,inside:{x:d.x-d.dx*2,y:d.y-d.dy*2,angle:0}}};
+let t=setup();p={...t.inside};update(.001);if(!visible(t.g,7,.7))throw Error('test setup: guard has no raw line of sight into the room');for(let i=0;i<60;i++)update(.05);if(t.g.meter>0||t.g.chasing)throw Error('hallway guard saw into a room');
+t=setup();p={x:t.d.x+t.d.dx*.6,y:t.d.y+t.d.dy*.6,angle:0};update(.05);if(!t.g.chasing)throw Error('hallway sighting did not start a chase');
+p={...t.inside};let followed=false;for(let i=0;i<200&&mode==='play';i++){update(.05);if(World.roomAt(world,t.g)?.id===t.r.id&&t.g.meter>0)followed=true}if(!followed&&mode!=='question')throw Error('chasing guard did not follow into the room');
+t=setup();p={x:t.d.x+t.d.dx*.6,y:t.d.y+t.d.dy*.6,angle:0};update(.05);makeNoise({x:t.g.x+3*t.d.dy,y:t.g.y+3*t.d.dx},10);if(t.g.chasing)throw Error('decoy noise did not break the chase');
+}`,context);console.log('PASS: hallway guards cannot see into rooms; a guard that spotted you in the hallway follows you in; decoys break the chase.');
