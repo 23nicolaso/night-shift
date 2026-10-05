@@ -54,7 +54,7 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path == '/health':
             self.json_response({'ready': router is not None, 'engine': 'Laya / local CPU' if router else 'local rules (Laya loading or unavailable)'})
-        elif self.path.split('?')[0] in ('/', '/index.html', '/style.css', '/world.js', '/art.js', '/security.js', '/audio.js', '/textures.js', '/puzzles.js', '/minigames.js', '/room_actions.js', '/game.js'):
+        elif self.path.split('?')[0] in ('/', '/index.html', '/style.css', '/world.js', '/art.js', '/security.js', '/audio.js', '/textures.js', '/puzzles.js', '/minigames.js', '/room_actions.js', '/tutorial.js', '/game.js'):
             super().do_GET()
         elif self.path.split('?')[0] in { '/assets/' + p.name for p in (ROOT / 'assets').glob('*.png') }:
             super().do_GET()

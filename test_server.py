@@ -31,6 +31,15 @@ class Decisions(unittest.TestCase):
                 self.assertIn('engine', json.load(response))
             with urlopen(base + '/') as response:
                 self.assertIn(b'NIGHT SHIFT', response.read())
+            # Every script referenced by the page must be served for startup to complete.
+            import re
+            with urlopen(base + '/') as response:
+                scripts = re.findall(rb'<script src="([^"]+)"', response.read())
+            for script in scripts:
+                with self.subTest(script=script):
+                    with urlopen(base + '/' + script.decode()) as response:
+                        self.assertEqual(response.status, 200)
+                        self.assertTrue(response.read())
             request = Request(base + '/decision', data=json.dumps({'answer': 'network maintenance'}).encode(), headers={'Content-Type': 'application/json'})
             with urlopen(request) as response:
                 self.assertEqual(json.load(response)['choice'], 'question')

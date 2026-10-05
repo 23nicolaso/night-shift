@@ -4,8 +4,8 @@ const dirs=[[1,0],[-1,0],[0,1],[0,-1]];
 function path(world,from,to,unlocked=false,respectDoors=false){const key=(x,y)=>x+','+y,start=[Math.floor(from.x),Math.floor(from.y)],goal=key(Math.floor(to.x),Math.floor(to.y)),queue=[start],parents=new Map([[key(...start),null]]);for(let i=0;i<queue.length;i++){const[x,y]=queue[i],k=key(x,y);if(k===goal){const result=[];for(let at=k;at!==null;at=parents.get(at)){const[xx,yy]=at.split(',').map(Number);result.push({x:xx+.5,y:yy+.5})}return result.reverse()}for(const[dx,dy]of dirs){const xx=x+dx,yy=y+dy,t=world.grid[yy]?.[xx],next=key(xx,yy),door=world.doors?.find(d=>d.x===xx&&d.y===yy);if((t===1||t===2&&unlocked||t===4)&&(!respectDoors||!door||door.open)&&!parents.has(next)){parents.set(next,k);queue.push([xx,yy])}}}return[]}
 function reachable(world,card){const seen=new Set(),queue=[[Math.floor(world.start.x),Math.floor(world.start.y)]];for(let i=0;i<queue.length;i++){const[x,y]=queue[i],k=x+','+y;if(seen.has(k))continue;seen.add(k);for(const[dx,dy]of dirs){const xx=x+dx,yy=y+dy,t=world.grid[yy]?.[xx];if((t===1||t===2&&card||t===4)&&!seen.has(xx+','+yy))queue.push([xx,yy])}}return seen}
 function roomAt(world,o){return world.rooms.find(r=>o.x>=r.x&&o.x<r.x+r.w&&o.y>=r.y&&o.y<r.y+r.h)}
-function generate(seed){
- const random=rng(seed),sizePresets=[{name:'small',cols:2,bands:2},{name:'medium',cols:3,bands:2},{name:'large',cols:3,bands:3},{name:'wide',cols:4,bands:2}],size=sizePresets[Math.floor(random()*sizePresets.length)],{cols,bands}=size,perBand=cols*2,count=perBand*bands,archive=Math.floor(random()*count),rooms=[],edges=[];
+function legacyLayout(random){
+ const sizePresets=[{name:'small',cols:2,bands:2},{name:'medium',cols:3,bands:2},{name:'large',cols:3,bands:3},{name:'wide',cols:4,bands:2}],size=sizePresets[Math.floor(random()*sizePresets.length)],{cols,bands}=size,perBand=cols*2,count=perBand*bands,archive=Math.floor(random()*count),rooms=[],edges=[];
  const types=['office','records','server','lounge','workshop','office','records','lounge','server','workshop','office','records'];
  const specs=Array.from({length:count},()=>({w:6+Math.floor(random()*6),h:5+Math.floor(random()*5)}));
  const widths=Array.from({length:cols},(_,col)=>Math.max(...specs.filter((_,i)=>Math.floor(i/2)%cols===col).map(s=>s.w))+5),xs=widths.map((_,i)=>5+widths.slice(0,i).reduce((a,b)=>a+b,0)),w=widths.reduce((a,b)=>a+b,0)+10;
@@ -28,10 +28,31 @@ function generate(seed){
  }
  for(let band=0;band<bands-1;band++){const x=band%2?3:w-4,col=band%2?0:cols-1;carve([{x,y:lanes[band][col]},{x,y:lanes[band+1][col]}],Math.min(radii[band],radii[band+1]));if(random()<.35){const otherX=band%2?w-4:3,otherCol=band%2?cols-1:0;carve([{x:otherX,y:lanes[band][otherCol]},{x:otherX,y:lanes[band+1][otherCol]}],Math.min(radii[band],radii[band+1]))}}
  for(const r of rooms){const x=Math.floor(r.cx),y=r.hallSide<0?r.y+r.h:r.y-1,dy=-r.hallSide;r.doors.push({x:x+.5,y:y+.5,dx:0,dy});for(let yy=y;yy!==Math.round(laneAt(r.band,x))+dy;yy+=dy){grid[yy][x]=1;hallway.add(x+','+yy)}}
+ return {size,cols,bands,archive,rooms,edges,w,h,grid,center,hallway,corridors,hallSegments,spine,lanes,radii,laneAt};
+}
+function variedLayout(random,layout){
+ const cols=3+Math.floor(random()*2),bands=3+Math.floor(random()*2),cell=25,w=cols*cell+6,h=bands*cell+6,count=cols*bands,archive=Math.floor(random()*count),grid=Array.from({length:h},()=>Array(w).fill(0)),rooms=[],hallway=new Set(),corridors=[],hallSegments=[],spine=[],edges=[];
+ const types=['office','records','server','lounge','workshop'];
+ for(let i=0;i<count;i++){const col=i%cols,band=Math.floor(i/cols),rw=7+Math.floor(random()*11),rh=6+Math.floor(random()*12),x=col*cell+7+Math.floor(random()*(19-rw)),y=band*cell+7+Math.floor(random()*(19-rh)),type=i===archive?'archive':types[Math.floor(random()*types.length)];const r={id:i,x,y,w:rw,h:rh,cx:x+Math.floor(rw/2)+.5,cy:y+Math.floor(rh/2)+.5,type,name:type.toUpperCase(),archive:i===archive,restricted:i===archive,doors:[],hallSide:1,band,col};rooms.push(r);for(let yy=y;yy<y+rh;yy++)for(let xx=x;xx<x+rw;xx++)grid[yy][xx]=1;}
+ const node=i=>({x:(i%cols)*cell+3,y:Math.floor(i/cols)*cell+3});
+ const carve=(a,b,radius=1)=>{corridors.push([a,b]);spine.push(a,b);for(let y=Math.min(a.y,b.y)-radius;y<=Math.max(a.y,b.y)+radius;y++)for(let x=Math.min(a.x,b.x)-radius;x<=Math.max(a.x,b.x)+radius;x++){if(x<1||y<1||x>=w-1||y>=h-1||rooms.some(r=>x>=r.x-1&&x<=r.x+r.w&&y>=r.y-1&&y<=r.y+r.h))continue;grid[y][x]=1;hallway.add(x+','+y)}};
+ const neighbors=i=>[i%cols?i-1:-1,i%cols<cols-1?i+1:-1,i>=cols?i-cols:-1,i<count-cols?i+cols:-1].filter(n=>n>=0);
+ const visited=new Set([0]),stack=[0],links=new Set();
+ const connect=(a,b)=>{const k=[a,b].sort((x,y)=>x-y).join(',');if(links.has(k))return;links.add(k);edges.push([a,b]);const radius=layout==='courtyards'?3:layout==='switchbacks'?1:1+Math.floor(random()*2);carve(node(a),node(b),radius)};
+ while(stack.length){const a=stack.at(-1),options=neighbors(a).filter(n=>!visited.has(n));if(!options.length){stack.pop();continue}const b=options[Math.floor(random()*options.length)];visited.add(b);connect(a,b);stack.push(b)}
+ for(let a=0;a<count;a++)for(const b of neighbors(a))if(a<b&&random()<(layout==='loops'?.8:layout==='courtyards'?.6:layout==='branches'?.08:.25))connect(a,b);
+ for(const r of rooms){const x=Math.floor(r.cx),y=r.y-1;r.doors.push({x:x+.5,y:y+.5,dx:0,dy:-1});for(let yy=r.band*cell+3;yy<=y;yy++){grid[yy][x]=1;hallway.add(x+','+yy)}carve(node(r.id),{x,y:r.band*cell+3},1);hallSegments.push({x:r.col*cell+3,y:r.band*cell+3,width:3,band:r.band,col:r.col})}
+ const center=n=>({x:Math.floor(rooms[n].cx),y:Math.floor(rooms[n].cy)});
+ return {size:{name:cols===4?'wide':'large'},cols,bands,archive,rooms,edges,w,h,grid,center,hallway,corridors,hallSegments,spine,lanes:[],radii:[],laneAt:()=>0};
+}
+function generate(seed,layoutOverride){
+ const random=rng(seed),layout=layoutOverride||['winding','branches','loops','courtyards','switchbacks'][Math.floor(rng(seed+':layout')()*5)];
+ const {size,cols,bands,archive,rooms,edges,w,h,grid,center,hallway,corridors,hallSegments,spine,lanes,radii,laneAt}=layout==='winding'?legacyLayout(random):variedLayout(random,layout);
  const archiveRoom=rooms[archive],entrance=archiveRoom.doors[0],door={x:Math.floor(entrance.x),y:Math.floor(entrance.y)};grid[door.y][door.x]=2;
- const world={seed,w,h,size:size.name,grid,rooms,door,doors:[],corridors,hallway:[...hallway],spine,hallSegments,guards:[],cameras:[],lasers:[],cover:[],decor:[],mission:['ORCHID employee records','GLASSHOUSE research files','NIGHTJAR financial ledger'][Math.floor(random()*3)],ticket:'N-'+(100+Math.floor(random()*900)),supervisor:['MERCER','IVES','SATO'][Math.floor(random()*3)]};
+ const world={seed,layout,w,h,size:size.name,grid,rooms,door,doors:[],corridors,hallway:[...hallway],spine,hallSegments,guards:[],cameras:[],lasers:[],cover:[],decor:[],mission:['ORCHID employee records','GLASSHOUSE research files','NIGHTJAR financial ledger'][Math.floor(random()*3)],ticket:'N-'+(100+Math.floor(random()*900)),supervisor:['MERCER','IVES','SATO'][Math.floor(random()*3)]};
  const point=n=>({x:center(n).x+.5,y:center(n).y+.5}),publicRooms=rooms.filter(r=>!r.archive),other=archiveRoom.doors[0];
- const startRoom=publicRooms.reduce((best,r)=>path(world,point(r.id),other,true).length>path(world,point(best.id),other,true).length?r:best,publicRooms[0]);world.start=point(startRoom.id);startRoom.type='lobby';startRoom.name='SERVICE LIFT';
+ const distances=new Map(),queue=[[Math.floor(other.x),Math.floor(other.y),0]];for(let i=0;i<queue.length;i++){const[x,y,d]=queue[i],key=x+','+y;if(distances.has(key))continue;distances.set(key,d);for(const[dx,dy]of dirs){const xx=x+dx,yy=y+dy;if(grid[yy]?.[xx]&&!distances.has(xx+','+yy))queue.push([xx,yy,d+1])}}
+ const distance=r=>distances.get(Math.floor(r.cx)+','+Math.floor(r.cy))??-1;const startRoom=publicRooms.reduce((best,r)=>distance(r)>distance(best)?r:best,publicRooms[0]);world.start=point(startRoom.id);startRoom.type='lobby';startRoom.name='SERVICE LIFT';
  const choices=publicRooms.filter(r=>r.id!==startRoom.id).sort(()=>random()-.5),cardRoom=choices[0],powerRoom=choices[1],badgeRoom=choices[2];world.card=point(cardRoom.id);world.power=point(powerRoom.id);world.badge=point(badgeRoom.id);world.target=point(archive);cardRoom.name='ACCESS CONTROL';powerRoom.name='POWER CONTROL';badgeRoom.name='CONTRACTOR OFFICE';
  choices[3].restricted=true;choices[3].name='RESTRICTED LAB';
  for(const r of rooms.filter(r=>r.restricted))for(const entry of r.doors){const d={x:Math.floor(entry.x),y:Math.floor(entry.y),dx:entry.dx,dy:entry.dy,roomId:r.id,keyRequired:r.archive,open:false};world.doors.push(d);grid[d.y][d.x]=r.archive?2:4}
@@ -41,10 +62,11 @@ function generate(seed){
  for(const r of rooms.filter(r=>r.w>=9&&r.h>=7&&r.type!=='lobby')){const cx=Math.floor(r.cx),cy=Math.floor(r.cy);for(const o of[{x:cx-3,y:cy-2,w:3,h:1},{x:cx+1,y:cy+2,w:3,h:1}]){if(blocksDoor(r,o.x,o.y,o.w)||o.x<r.x+1||o.x+o.w>r.x+r.w-1||o.y<=r.y||o.y>=r.y+r.h-1)continue;world.cover.push({...o,kind:r.type==='server'?'rack':'desk'});for(let x=o.x;x<o.x+o.w;x++)grid[o.y][x]=3}}
  world.patrolPoints=publicRooms.map(r=>point(r.id));
  const guardSpawns=publicRooms.filter(r=>r.id!==startRoom.id&&r.id!==badgeRoom.id).sort(()=>random()-.5);
- for(let i=0;i<4;i++){const spawn=point(guardSpawns[i].id);world.guards.push({...spawn,angle:random()*Math.PI*2,meter:0,cool:0,route:[],routeIndex:0,pause:random()*2,patrolSeed:Math.floor(random()*1e9),lastSeen:null,search:0})}
+ const guardCount=Math.min(guardSpawns.length,6+Math.floor(rooms.length/5)+Math.floor(random()*3));
+ for(let i=0;i<guardCount;i++){const spawn=point(guardSpawns[i].id);const profile=['sentinel','scout','listener','warden'][Math.floor(random()*4)],traits={sentinel:[1.15,8.5,.52,8],scout:[2.15,6,.8,11],listener:[1.5,6.5,.7,19],warden:[1.65,7.5,.9,13]}[profile];world.guards.push({...spawn,profile,speed:traits[0]*1.15,vision:traits[1],spread:traits[2],hearing:traits[3],tint:['#bc835c','#619baa','#859165','#a878ab'][['sentinel','scout','listener','warden'].indexOf(profile)],angle:random()*Math.PI*2,meter:0,cool:0,route:[],routeIndex:0,pause:random()*2,patrolSeed:Math.floor(random()*1e9),lastSeen:null,search:0})}
  for(const r of [cardRoom,archiveRoom,...choices.slice(3,5)]){const x=r.cx,y=r.y+.6;world.cameras.push({x,y,angle:Math.PI/2,baseAngle:Math.PI/2,phase:random()*6.28,meter:0,disabledUntil:0});r.security=true}
  // Waist-high equipment islands block camera sight, with routes on both sides.
- for(const segment of hallSegments.filter(s=>(s.col+s.band)%2===0||s.band===0&&s.col===1)){
+ for(const segment of (layout==='winding'?hallSegments:[]).filter(s=>(s.col+s.band)%2===0||s.band===0&&s.col===1)){
   const obstacleX=[0,-2,2,-3,3].map(offset=>segment.x+offset).find(x=>!rooms.some(r=>r.band===segment.band&&Math.floor(r.doors[0].x)===x)&&grid[Math.round(laneAt(segment.band,x))]?.[x]===1&&grid[Math.round(laneAt(segment.band,x))]?.[x+1]===1);
   if(obstacleX===undefined)continue;
   const obstacle={x:obstacleX,y:Math.round(laneAt(segment.band,obstacleX)),w:1,h:1,kind:'rack',corridor:true};
@@ -56,7 +78,7 @@ function generate(seed){
  // Hide-behind crates: set one row in from a hallway wall, leaving a pocket behind them and the lane centre clear.
  // A crate is kept only if the hallway floor stays one connected piece; door stubs and corridor cameras get a margin.
  const hallConnected=()=>{const floor=[...hallway].filter(k=>{const[x,y]=k.split(',').map(Number);return grid[y][x]!==3}),open=new Set(floor),seen=new Set([floor[0]]),queue=[floor[0]];for(let i=0;i<queue.length;i++){const[x,y]=queue[i].split(',').map(Number);for(const[dx,dy]of dirs){const next=(x+dx)+','+(y+dy);if(open.has(next)&&!seen.has(next)){seen.add(next);queue.push(next)}}}return seen.size===open.size};
- for(let band=0;band<bands;band++){
+ for(let band=0;layout==='winding'&&band<bands;band++){
   let side=random()<.5?-1:1;
   for(let x=7+Math.floor(random()*4);x<w-9;x+=5+Math.floor(random()*4)){
    const lane=Math.round(laneAt(band,x));
@@ -67,10 +89,22 @@ function generate(seed){
     if(!fits||!clear)continue;
     tiles.forEach(([tx,ty])=>grid[ty][tx]=3);
     if(!hallConnected()){tiles.forEach(([tx,ty])=>grid[ty][tx]=1);continue}
-    world.cover.push({x,y,w:2,h:1,kind:'crate',hall:true});side=-trySide;break;
+    world.cover.push({x,y,w:2,h:1,kind:['crate','sofa','cabinet','cart','planter','barrier'][Math.floor(random()*6)],hall:true,pocket:true});side=-trySide;break;
    }
   }
  }
+ // Equipment islands have different silhouettes and never seal a route or a doorway.
+ const furnitureCandidates=[...hallway].sort(()=>random()-.5);let furniture=0;
+ for(const key of furnitureCandidates){if(furniture>=10+Math.floor(random()*9))break;const[x,y]=key.split(',').map(Number),ww=random()<.35?2:1,hh=random()<.22?2:1;
+  const tiles=[];for(let yy=y;yy<y+hh;yy++)for(let xx=x;xx<x+ww;xx++)tiles.push([xx,yy]);
+  if(!tiles.every(([xx,yy])=>grid[yy]?.[xx]===1&&hallway.has(xx+','+yy))||rooms.some(r=>r.doors.some(d=>Math.hypot(d.x-x,d.y-y)<4))||world.cover.some(o=>x<o.x+o.w+2&&x+ww>o.x-2&&y<o.y+o.h+2&&y+hh>o.y-2)||world.cameras.some(c=>Math.hypot(c.x-x,c.y-y)<4))continue;
+  tiles.forEach(([xx,yy])=>grid[yy][xx]=3);if(!hallConnected()){tiles.forEach(([xx,yy])=>grid[yy][xx]=1);continue}
+  const pushable=ww===1&&hh===1&&random()<.4;
+  world.cover.push({x,y,w:ww,h:hh,kind:pushable?'crate':['crate','rack','sofa','cabinet','cart','planter','barrier'][Math.floor(random()*7)],hall:true,pushable});furniture++;
+  if(layout!=='winding'&&!pushable&&ww===1&&hh===1&&grid[y]?.[x-2]===1&&grid[y]?.[x-1]===1&&grid[y]?.[x+1]===1){world.cameras.push({x:x-1.5,y:y+.5,angle:0,baseAngle:0,phase:random()*6.28,meter:0,disabledUntil:0,corridor:true,safeSpot:{x:x+1.5,y:y+.5}})}
+ }
+ // Large rooms receive staggered banks of beams, with full-width crossings and safe timing gaps.
+ for(const r of rooms.filter(r=>r.w>=13&&r.h>=12&&r.type!=='lobby')){r.laserHall=true;for(let y=r.y+3;y<r.y+r.h-2;y+=3){const period=5+random()*3;world.lasers.push({x:r.x+r.w/2,y:y+.5,dx:0,dy:1,length:r.w,phase:random()*period,period,onTime:period*(.35+random()*.2)})}}
  for(const r of choices.slice(3,6)){const entry=r.doors[0];if(!entry)continue;world.lasers.push({...entry,phase:random()*5,period:5,onTime:2.8})}
  world.edges=edges;
  world.stations=rooms.map(r=>{
@@ -85,7 +119,7 @@ function generate(seed){
  const intel=world.stations.filter(s=>s.effect==='intel');
  if(intel.length<2){for(const s of world.stations.filter(s=>!['archive','power','lasers','map','intel'].includes(s.effect)).slice(0,2-intel.length)){s.effect='intel';s.type='drawers';s.label='PATROL RECORDS';s.sprite='cabinet'}}
  const shuffled=items=>{const copy=[...items];for(let i=copy.length-1;i>0;i--){const j=Math.floor(missionRandom()*(i+1));[copy[i],copy[j]]=[copy[j],copy[i]]}return copy};
- const files=shuffled(world.stations.filter(s=>s.effect==='intel')),candidates=shuffled(world.stations.filter(s=>!['archive','power','lasers','map','intel'].includes(s.effect))),step=s=>'station:'+s.id;
+ const files=shuffled(world.stations.filter(s=>s.effect==='intel')),candidates=shuffled(world.stations.filter(s=>!['archive','power','map'].includes(s.effect)&&!files.slice(0,2).includes(s))),step=s=>'station:'+s.id;
  const convert=(station,effect,type,label)=>{station.effect=effect;station.type=type;station.label=label;station.sprite=type==='drawers'?'cabinet':'terminal';station.assignment=true;rooms[station.roomId].name=label;return station};
  if(world.missionType==='archive')world.missionSteps=['card','power','archive'];
  if(world.missionType==='sabotage')world.missionSteps=['power','lasers'];
@@ -104,6 +138,10 @@ function generate(seed){
   const pickup=convert(candidates[0],'drive','drawers','ENCRYPTED DRIVE CABINET'),receiver=convert(candidates[1],'upload','cables','DEAD-DROP TRANSMITTER');receiver.requires=pickup.id;
   world.missionSteps=[step(pickup),step(receiver)];
  }
+ world.securityVariant=['standard','dual-card','password'][Math.floor(random()*3)];world.extraCards=[];world.notes=[];
+ const gate=world.doors.find(d=>d.keyRequired);
+ if(world.securityVariant==='dual-card'){world.extraCards.push({...point(choices.at(-1).id),collected:false,label:'AMBER ACCESS CARD'});gate.cardsRequired=2}
+ if(world.securityVariant==='password'){world.notes.push({...point(choices.at(-1).id),read:false,code:String(1000+Math.floor(random()*9000)),label:'VAULT PASSWORD NOTEPAD'});gate.password=world.notes[0].code}
  world.missionTitle={archive:'Recover classified files',sabotage:'Sabotage building security',intel:'Gather patrol intelligence',surveillance:'Blind the surveillance network',wiretap:'Plant communications wiretaps',wipe:'Erase the research evidence',courier:'Deliver an encrypted dead drop'}[world.missionType];
  return world;
 }

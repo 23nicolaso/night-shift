@@ -62,4 +62,14 @@ On another machine: create a Python 3.10+ virtual environment, install `requirem
 - `python -m unittest test_server.py`: decision rules and HTTP routes.
 - `.venv\Scripts\python.exe browser_smoke.py`: real Edge browser tests for firewall prerequisite, extraction, strict questioning, identity, tools and moving patrols during hacking. Requires `requirements-dev.txt`.
 
-`preview.png` shows the current game. This remains a one-floor prototype; vents, weapons, vaults and floor progression are not implemented.
+`preview.png` shows the current game. This remains a one-floor prototype; vents, weapons and floor progression are not implemented.
+
+## Procedural floor expansion
+
+Floors now select winding bands, branching networks, dense loops, broad courtyards or narrow switchbacks. Room dimensions, corridor connections and furniture placements vary by seed. Large rooms can contain several staggered laser banks with independently seeded pulse cycles; wait for a dark beam before crossing. Floor equipment offers wood, metal, carpet and rubber textures on crates, cabinets, carts, sofas, planters, barriers and racks.
+
+Normal movement runs at 5.2 tiles per second and emits footsteps every 0.45 seconds while moving. Hold Shift for silent movement at 2 tiles per second. Opening and closing doors attracts guards even while sneaking. Face a small striped crate and press F to push it one tile; the scrape is audible, and moves that would seal an escape route are prevented.
+
+Sentinels have longer narrow vision and slower movement, scouts move faster, listeners hear farther, and wardens have wider vision. Uniform colors distinguish profiles. Patrol counts and routes vary. Vault security alternates between a cyan card, two cards found in separate rooms, or a cyan card plus a four-digit password on a notepad elsewhere. The briefing explains the floor's security requirement.
+
+Run `node test_variations.js` for seeded variation and prerequisite reachability checks alongside `node test_world.js` and `node test_game.js`.

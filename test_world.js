@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict'),W=require('./world.js');
 let crates=0;const layouts=new Set(),mapSizes=new Set(),roomCounts=new Set();
 for(let seed=0;seed<100;seed++){
- const w=W.generate('winding-'+seed);assert(w.doors.some(d=>d.keyRequired));assert(w.doors.some(d=>!d.keyRequired));
+ const w=W.generate('winding-'+seed,'winding');assert(w.doors.some(d=>d.keyRequired));assert(w.doors.some(d=>!d.keyRequired));
  const archive=w.rooms.find(r=>r.archive),layout={...w,grid:w.grid.map(row=>row.map(tile=>tile===3?1:tile))},startDistance=W.path(layout,w.start,archive.doors[0],true).length;for(const room of w.rooms.filter(r=>!r.archive))assert(startDistance>=W.path(layout,{x:room.cx,y:room.cy},archive.doors[0],true).length,'lift is not at the farthest public room in the floor layout');
  const roomTiles=new Set();for(const r of w.rooms){assert.equal(r.doors.length,1,'room must be a hallway branch');for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x+r.w;x++)roomTiles.add(x+','+y)}
  const hall=new Set(w.hallway);for(const tile of hall)assert(!roomTiles.has(tile),'hallway passes through a room');
@@ -11,7 +11,7 @@ for(let seed=0;seed<100;seed++){
  assert(w.rooms.some(r=>r.hallSide===-1)&&w.rooms.some(r=>r.hallSide===1),'rooms must flank hallway');
  for(const segment of w.hallSegments){assert(segment.width>=5&&segment.width<=7);const radius=Math.floor(segment.width/2);for(let y=segment.y-radius;y<=segment.y+radius;y++)assert(hall.has(segment.x+','+y),'hallway narrows below advertised width')}
  assert(w.cameras.filter(c=>c.corridor).length>=3,'missing corridor cameras');
- for(const crate of w.cover.filter(c=>c.hall)){crates++;for(let x=crate.x;x<crate.x+crate.w;x++){assert(hall.has(x+','+crate.y),'crate outside hallway');assert(hall.has(x+','+(crate.y-1))&&hall.has(x+','+(crate.y+1)),'crate has no walkable pocket on both sides')}}
+ for(const crate of w.cover.filter(c=>c.pocket)){crates++;for(let x=crate.x;x<crate.x+crate.w;x++){assert(hall.has(x+','+crate.y),'crate outside hallway');assert(hall.has(x+','+(crate.y-1))&&hall.has(x+','+(crate.y+1)),'crate has no walkable pocket on both sides')}}
  const floorHall=new Set([...hall].filter(key=>{const[x,y]=key.split(',').map(Number);return w.grid[y][x]!==3})),walked=new Set(),walkQueue=[[...floorHall][0]];for(let i=0;i<walkQueue.length;i++){const key=walkQueue[i];if(walked.has(key))continue;walked.add(key);const[x,y]=key.split(',').map(Number);for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]]){const next=(x+dx)+','+(y+dy);if(floorHall.has(next)&&!walked.has(next))walkQueue.push(next)}}assert.equal(walked.size,floorHall.size,'security cover blocks hallway bypass');
  for(const camera of w.cameras.filter(c=>c.corridor)){const spot=camera.safeSpot;assert.equal(w.grid[Math.floor(spot.y)][Math.floor(spot.x)],1);assert(floorHall.has(Math.floor(spot.x)+','+Math.floor(spot.y)));const distance=Math.hypot(spot.x-camera.x,spot.y-camera.y);let blocked=false;for(let t=.1;t<distance;t+=.1){const ratio=t/distance;if(w.grid[Math.floor(camera.y+(spot.y-camera.y)*ratio)][Math.floor(camera.x+(spot.x-camera.x)*ratio)]===3)blocked=true}assert(blocked,'camera cover does not occlude its safe spot')}
 }

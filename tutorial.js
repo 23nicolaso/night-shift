@@ -9,7 +9,7 @@ const Tutorial={
  alwaysShow:true,
  shownThisSession:false,steps:[],index:0,pressed:new Set(),caps:[],tiles:[],scenes:[],guide:null,nudge:false,
  controls:[
-  {scene:'move',caps:['W','A','S','D'],label:'Move',caption:'or arrow keys'},
+  {scene:'move',caps:['W','A','S','D'],label:'Run',caption:'fast � noisy footsteps'},
   {scene:'sneak',caps:['Shift'],label:'Sneak',caption:'hold · harder to spot'},
   {scene:'dash',caps:['Space'],label:'Dash',caption:'fast · makes noise'},
   {scene:'decoy',caps:['Q'],label:'Decoy',caption:'lures guards away'},
