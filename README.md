@@ -4,7 +4,7 @@ Double-click `launch.bat`, then open http://127.0.0.1:8765. Keep its terminal ru
 
 ## Mission and tactics
 
-The first assignment in a browser is followed by a paused training walkthrough. It shows each control as a looping animation (keys light up when you press them), then teaches E hands-on: you walk around the starting room, with security still paused, and press E at the spotlit floor directory. It then spotlights the service lift, gives one card per mission objective (where it is, what to do there, its time limit and what it unlocks or requires), and finishes with a card on threats. After training, a banner guides your first E press. Click **? Tutorial** in the header to replay it; Esc skips it. Set `Tutorial.objectiveLayout` in `tutorial.js` to `'list'` to show every objective on one card instead.
+The first assignment in a browser is followed by a paused training walkthrough. It shows each control as a looping animation (keys light up when you press them), then teaches E and the floor directory as part of the live mission: the directory is placed in a random non-starting room for you to find and use. It then spotlights the service lift, gives one card per mission objective (where it is, what to do there, its time limit and what it unlocks or requires), and finishes with a card on threats. After training, a banner guides your first E press. Click **? Tutorial** in the header to replay it; Esc skips it. Set `Tutorial.objectiveLayout` in `tutorial.js` to `'list'` to show every objective on one card instead.
 
 Usable things are marked in play: amber diamonds over unfinished objectives, cyan diamonds over optional equipment. Whatever E would act on gets a ring and an [E] keycap, and a prompt at the bottom of the screen names it. When two things are in reach, E uses the closest one that is still usable.
 
@@ -23,7 +23,7 @@ Rotate circuit tiles to connect live current, drag matching cables into sockets,
 | WASD / arrows | Move |
 | Shift | Sneak: slower movement and detection |
 | Space | Short dash, 3.2-second cooldown; makes noise |
-| Q | Throw one of three decoys ahead; nearby guards investigate |
+| Q | Throw a lure toward the cursor within a 4-tile radius; 5-second cooldown |
 | R | Scan the direction of your next objective for 3 seconds |
 | E | Collect/read items, hack consoles, or short a nearby camera |
 
@@ -37,7 +37,7 @@ Each seed packs 12 differently sized rooms onto both sides of a continuous serpe
 
 Use the floor directory to reveal the layout. While outside a room, custom drawn electrical, camera, file, toolkit, supply, keycard and lift symbols identify rooms on the floor and minimap. These are canvas artwork, not emoji; directory knowledge resets with each floor. The directory does not reveal hidden guards.
 
-The play screen uses the full window with no sidebar, control legend, telemetry or log. Mission instructions appear in the opening briefing; machine instructions explain their controls and effects beneath their names in interaction panels. Instant pickups show a confirmation panel; Continue or Escape returns to play. The toolkit adds 10 seconds to hacking, reduces dash cooldown from 3.2 to 2 seconds, and adds one decoy.
+The play screen uses the full window with no sidebar, control legend, telemetry or log. Mission instructions appear in the opening briefing; machine instructions explain their controls and effects beneath their names in interaction panels. Instant pickups show a confirmation panel; Continue or Escape returns to play. The toolkit adds 10 seconds to hacking and reduces dash cooldown from 3.2 to 2 seconds.
 
 Fog reveals the complete current room plus up to 18 tiles through open doorways. Corridor vision extends 16 tiles and stops at walls and closed doors. The view is zoomed out to show more surroundings. Explored areas stay dimly visible; unseen enemies remain hidden. Original PNG textures include carpet, wood, brushed metal, rubber, circuit boards, cabinets, supplies, tools, relays and terminals, alongside canvas walls and characters. All art works offline. `generate_textures.py` regenerates the PNG assets using Pillow; Pillow is not required to play.
 

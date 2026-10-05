@@ -26,8 +26,8 @@ const RoomActions={
    case'lasers':lasersUntil=clock+50;log('Laser relay bypassed. All beam traps disabled for 50 seconds.');break;
    case'intel':radarUntil=clock+45;world.rooms.forEach(r=>{for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x+r.w;x++)explored.add(x+','+y)});log('Patrol file acquired. Room map revealed; guards tracked on the minimap for 45 seconds.');break;
    case'map':directoryKnown=true;for(let y=0;y<world.h;y++)for(let x=0;x<world.w;x++)if(world.grid[y][x])explored.add(x+','+y);log('Floor directory scanned. Layout and discovered objective positions now appear on your minimap.');break;
-   case'supplies':charges=Math.min(5,charges+2);log('Supply cabinet searched. Two noise decoys added (capacity five).');break;
-   case'tools':toolUpgrade=true;charges=Math.min(5,charges+1);log('Toolkit upgraded: 10 extra hacking seconds, a faster dash recharge, and one decoy.');break;
+   case'supplies':log('Supply cabinet searched. Lure cooldown remains five seconds.');break;
+   case'tools':toolUpgrade=true;log('Toolkit upgraded: 10 extra hacking seconds and a faster dash recharge.');break;
    case'wiretap':radarUntil=Math.max(radarUntil,clock+45);log('Listening device planted. Intercepted patrol traffic reveals guards for 45 seconds.');break;
    case'wipe':world.hotExtraction=true;world.guards.forEach(g=>{g.cool=0;g.lastSeen={...station};g.search=15;g.route=[]});log('Research erased. Security is hunting you: avoid being caught and return to the lift.');break;
    case'drive':log('Encrypted drive recovered. Take it to the dead-drop transmitter.');break;

@@ -84,7 +84,7 @@ try:
         page.get_by_text('Your cover is blown.', exact=True).wait_for()
         page.evaluate("reset('class-demo'); world.cameras=[]; world.lasers=[]; world.guards=[]")
         page.keyboard.press('q')
-        assert page.evaluate('charges===2')
+        assert page.evaluate('lureReady>clock')
         page.keyboard.press('Space')
         assert page.evaluate('dashReady>clock')
         page.evaluate("p={...world.power}; const r=World.roomAt(world,p); world.guards=[{x:r.x+1.5,y:r.cy,angle:Math.PI,meter:0,cool:99,route:[],routeIndex:0,pause:0,patrolSeed:5,lastSeen:null,search:0}]; hack('power')")

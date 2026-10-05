@@ -30,7 +30,7 @@ s=s[:a]+''' // Mission selection uses its own random stream so geometry stays re
 p=Path('game.js');s=p.read_text(encoding='utf-8');a=s.index('function missionLabel(');b=s.index('function objective()',a)
 s=s[:a]+'''function missionLabel(step){
  if(step==='card')return 'Steal the cyan access card';if(step==='power')return 'Override the power breaker';if(step==='archive')return 'Download classified archive';if(step==='lasers')return 'Sabotage the restricted lab relay';
- const station=missionPoint(step),room=station?world.rooms[station.roomId]:null,location=' in '+(room?.name.toLowerCase()||'the target room')+' (room '+(station?.roomId+1)+')';
+ const station=missionPoint(step),room=station?world.rooms[station.roomId]:null,location=' in '+(room?.name.toLowerCase()||'the target room');
  if(station?.effect==='intel')return (world.missionType==='wipe'?'Retrieve the erasure authorization file':'Retrieve a patrol file')+location;
  const verbs={cameras:'Disable the camera network node',wiretap:'Plant a listening device',wipe:'Erase the research database',drive:'Retrieve the encrypted drive',upload:'Transmit the encrypted drive'};
  return (verbs[station?.effect]||'Service the mission station')+location;

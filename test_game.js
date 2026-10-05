@@ -36,7 +36,7 @@ reset('tactics');fog();const r=World.roomAt(world,p);
 for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x+r.w;x++)if(!inView.has(x+','+y))throw Error('current room not fully revealed');
 const d=r.doors[0];if(d&&world.grid[Math.floor(d.y+d.dy)]?.[Math.floor(d.x+d.dx)]===1&&!inView.has(Math.floor(d.x+d.dx)+','+Math.floor(d.y+d.dy)))throw Error('no doorway peek');
 const beforeX=p.x;dash();update(.05);if(Math.hypot(p.x-beforeX,p.y-world.start.y)<.4)throw Error('dash failed');
-const chargeBefore=charges;decoy();if(charges!==chargeBefore-1||!noiseMarks.length)throw Error('decoy failed');
+const lureBefore=lureReady;decoy();if(lureReady<=lureBefore||!noiseMarks.length)throw Error('lure failed');
 world.guards=[];world.cameras=[];world.lasers=[];p={...world.power};hack('power');const time=clock;update(.2);if(clock<=time)throw Error('hacking paused the world');update(hackDeadline-clock+1);if(mode!=='play')throw Error('trace timer did not disconnect');
 const generic={answer:'maintenance',ticket:'N-123',supervisor:'IVES',attempt:0,severity:1,strikes:0};if(Security.policy(generic,'release')!=='question')throw Error('generic excuse accepted');if(Security.policy({...generic,attempt:1},'release')!=='alert')throw Error('repeat vague excuse accepted');
 const valid={...generic,badge:true,answer:'IVES sent me for network diagnostics, work order N-123'};if(Security.policy(valid,'release')!=='release')throw Error('valid work order rejected');if(Security.policy({...valid,strikes:2},'release')!=='release')throw Error('reasonable repeated stop automatically failed');if(Security.policy({...valid,severity:3},'release')!=='alert')throw Error('restricted evidence ignored');
@@ -58,7 +58,7 @@ vm.runInContext(`
 reset('rooms');world.guards=[];world.cameras=[];world.lasers=[];
 if(world.stations.length!==world.rooms.length)throw Error('room lacks purpose');
 for(const station of world.stations){if(world.grid[Math.floor(station.y)]?.[Math.floor(station.x)]!==1)throw Error('station blocked by cover')}
-const supplies=world.stations.find(s=>s.effect==='supplies');if(supplies){charges=0;RoomActions.use(supplies);if(charges!==2)throw Error('supplies did not replenish');RoomActions.use(supplies);if(charges!==2)throw Error('supplies farmed repeatedly')}
+const supplies=world.stations.find(s=>s.effect==='supplies');if(supplies){const lureCooldown=lureReady;RoomActions.use(supplies);if(lureReady!==lureCooldown)throw Error('supplies changed lure cooldown');RoomActions.use(supplies)}
 const tools=world.stations.find(s=>s.effect==='tools');if(tools){RoomActions.use(tools);if(!toolUpgrade)throw Error('tool upgrade missing')}
 p={...world.power};hack('power');const breaker=MiniGames.active.state;for(let i=0;i<3;i++){let n=0;while((Math.abs(breaker.needle-breaker.center)>breaker.width/4||breaker.time-breaker.lastHit<.3)&&n++<1000)Puzzles.tick(breaker,.01);Puzzles.strike(breaker);MiniGames.check()}if(!firewall||powerUntil<=clock)throw Error('breaker did not power down security');
 const station=world.stations.find(s=>s.effect==='cameras');if(station){RoomActions.use(station);const old=MiniGames.active;reset('new-run');old.onwin();if(world.stations.some(s=>s.used))throw Error('stale puzzle granted reward on new run')}
@@ -88,9 +88,8 @@ vm.runInContext(`{
 // First-run training: paused cards, one per objective (or one list card), key lighting, replay, and the live guide.
 Tutorial.alwaysShow=false;Tutorial.shownThisSession=false;originalReset('training',true);Briefing.begin();
 if(mode!=='tutorial')throw Error('training did not start');const frozen=clock;update(3);if(clock!==frozen)throw Error('security advanced during training');
-const directory=Tutorial.directory();if(!directory||directory.label!=='FLOOR DIRECTORY')throw Error('lift room directory missing');
-if(Tutorial.steps.length!==world.missionSteps.length+5)throw Error('expected controls, directory, lift, one card per objective, threats and ready cards');
-if(!Tutorial.steps[1].spot.includes(directory))throw Error('directory is not spotlit');
+const directory=Tutorial.directory();if(!directory||directory.label!=='FLOOR DIRECTORY'||directory.roomId===World.roomAt(world,world.start)?.id)throw Error('directory should be in a non-starting room');
+if(Tutorial.steps.length!==world.missionSteps.length+4)throw Error('expected controls, lift, one card per objective, threats and ready cards');
 for(const step of world.missionSteps){const o=Tutorial.objective(step);if(!o.how||!o.where||!o.summary)throw Error('objective card incomplete: '+step)}
 Tutorial.render();Tutorial.key({key:'Shift'});Tutorial.key({key:'ArrowUp'});if(!Tutorial.pressed.has('shift')||!Tutorial.pressed.has('w'))throw Error('key lighting missed presses');
 Tutorial.key({key:'e'});if(card||badge||mode!=='tutorial')throw Error('E acted on the world during training');
@@ -104,15 +103,11 @@ const goals=interactableMarks().filter(m=>m.goal).map(m=>m.o);for(const step of 
 Tutorial.stop();originalReset('training',true);Briefing.begin();if(mode!=='play')throw Error('training repeated within a session');
 }`,context);console.log('PASS: first-run training pauses security, covers controls, the lift-room directory, each objective and threats; markers and the [E] reach cue track interactables.');
 vm.runInContext(`{
-// Hands-on E practice: walk (lift room only, security frozen), press E at the directory, then continue.
-Tutorial.shownThisSession=false;originalReset('practice',true);Briefing.begin();Tutorial.next();const d=Tutorial.directory(),frozen=clock;
-if(!Tutorial.practicing())throw Error('directory card is not a practice step');Tutorial.animate(1.5);
-p={x:world.start.x,y:world.start.y,angle:0};Tutorial.key({key:'e'});if(d.used||!Tutorial.nudge)throw Error('E away from the directory should only nudge');
-keys.add('d');for(let i=0;i<40;i++)update(.05);keys.clear();if(p.x<=world.start.x)throw Error('could not walk during practice');if(World.roomAt(world,p)?.id!==Tutorial.lobby().id)throw Error('left the lift room during practice');
-p={x:d.x-.6,y:d.y,angle:0};Tutorial.key({key:'e'});if(!d.used||!directoryKnown||mode!=='tutorial')throw Error('practice E did not scan the directory');if(clock!==frozen)throw Error('security advanced during practice');
-keys.add('a');for(let i=0;i<400;i++)update(.05);keys.clear();if(World.roomAt(world,p)?.id!==Tutorial.lobby().id)throw Error('walked out of the lift room');
-while(mode==='tutorial')Tutorial.next();if(Tutorial.guide?.stage!=='scan')throw Error('guide should skip to R after practice');
-}`,context);console.log('PASS: E is practised at the floor directory with security frozen and movement confined to the lift room.');
+// The directory is discovered during the live mission rather than practiced in the lift room.
+Tutorial.shownThisSession=false;originalReset('practice',true);Briefing.begin();Tutorial.next();
+if(Tutorial.practicing())throw Error('directory should not be a starting-room practice step');
+while(mode==='tutorial')Tutorial.next();if(Tutorial.guide?.stage!=='directory')throw Error('training should point to the live directory guide');
+}`,context);console.log('PASS: the floor directory is discovered in a separate room during live play.');
 vm.runInContext(`{
 // Room privacy: a hallway guard cannot see into a room, but a guard that spotted you in the hallway follows you in.
 const setup=()=>{originalReset('privacy',false);mode='play';world.cameras=[];world.lasers=[];const r=world.rooms.find(r=>!r.restricted&&r.type!=='lobby'),d=r.doors[0],at=k=>({x:d.x+d.dx*k,y:d.y+d.dy*k}),k=[4,3,2].find(k=>!solid(at(k).x,at(k).y));const g={...at(k),angle:Math.atan2(-d.dy,-d.dx),meter:0,cool:0,pause:0,route:[],routeIndex:0,patrolSeed:5,search:0,lastSeen:null};world.guards=[g];return{r,d,g,inside:{x:d.x-d.dx*2,y:d.y-d.dy*2,angle:0}}};

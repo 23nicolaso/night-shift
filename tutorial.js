@@ -1,6 +1,6 @@
 // First-run training. Cards run in mode 'tutorial', which update() skips, so security stays frozen.
-// The controls card shows each move as a looping animation; E is taught hands-on at the floor directory,
-// where the player may walk around the lift room (still paused). After the last card a live banner points at R.
+// The controls card shows each move as a looping animation. The floor directory is placed elsewhere
+// on the floor, so the player finds it during the live mission.
 const Tutorial={
  // 'cards' gives each objective its own card; 'list' puts every objective on one card.
  objectiveLayout:'cards',
@@ -9,10 +9,10 @@ const Tutorial={
  alwaysShow:true,
  shownThisSession:false,steps:[],index:0,pressed:new Set(),caps:[],tiles:[],scenes:[],guide:null,nudge:false,
  controls:[
-  {scene:'move',caps:['W','A','S','D'],label:'Run',caption:'fast � noisy footsteps'},
+  {scene:'move',caps:['W','A','S','D'],label:'Run',caption:'fast � noisy footsteps'},
   {scene:'sneak',caps:['Shift'],label:'Sneak',caption:'hold · harder to spot'},
   {scene:'dash',caps:['Space'],label:'Dash',caption:'fast · makes noise'},
-  {scene:'decoy',caps:['Q'],label:'Decoy',caption:'lures guards away'},
+  {scene:'decoy',caps:['Q'],label:'Lure',caption:'throw toward cursor'},
   {scene:'scan',caps:['R'],label:'Scan',caption:'points to your goal'}
  ],
  arrows:{arrowup:'w',arrowleft:'a',arrowdown:'s',arrowright:'d',' ':'space'},
@@ -41,14 +41,13 @@ const Tutorial={
   if(!this.practicing())return;
   const dx=(keys.has('d')||keys.has('ArrowRight')?1:0)-(keys.has('a')||keys.has('ArrowLeft')?1:0),dy=(keys.has('s')||keys.has('ArrowDown')?1:0)-(keys.has('w')||keys.has('ArrowUp')?1:0);
   p.sneaking=keys.has('Shift');p.moving=!!(dx||dy);if(!p.moving)return;
-  p.angle=Math.atan2(dy,dx);const speed=(p.sneaking?2:3.5)*dt/Math.hypot(dx,dy),before={x:p.x,y:p.y};move(dx*speed,dy*speed);
+  const targetAngle=Math.atan2(dy,dx),diff=Math.atan2(Math.sin(targetAngle-p.angle),Math.cos(targetAngle-p.angle));p.angle+=Math.max(-dt*14,Math.min(dt*14,diff));const speed=(p.sneaking?2.2:3.8)*dt/Math.hypot(dx,dy),before={x:p.x,y:p.y};move(dx*speed,dy*speed);
   if(World.roomAt(world,p)?.id!==this.lobby()?.id){p.x=before.x;p.y=before.y}
  },
  use(){const d=this.directory();if(!d||d.used)return;if(reachTarget()===d){RoomActions.reward(d);this.nudge=false}else this.nudge=true;this.render()},
  build(){
   const steps=[{tag:'CONTROLS',title:'Your kit',controls:true}];
   const directory=this.directory();
-  if(directory)steps.push({tag:'INTERACTING',title:'Press E to use things',spot:[directory],practice:true});
   steps.push({tag:'EXTRACTION',title:'Service lift',spot:[world.start],points:['This lift is your way out. Once every objective is done, come back here and press E to extract.','If you try to leave early, the lift reminds you what is still left.']});
   const objectives=world.missionSteps.map(step=>this.objective(step));
   if(this.objectiveLayout==='list')steps.push({tag:'MISSION',title:world.missionTitle,list:objectives});
@@ -60,13 +59,13 @@ const Tutorial={
    'Cameras: amber cones that sweep back and forth. A full camera bar also gets you questioned. Press E beside a camera to short it for 12 seconds, but the spark makes noise.',
    'Laser gates: cross only while the beam is off. Each trip records an alarm, and two alarms lock the floor down.',
    'OFF LIMITS rooms have striped doors. Being seen inside one, or seen anywhere after you have stolen files, ends the mission instantly. No explanation will save you.',
-   'Noise: dashing, decoys and shorted cameras all make noise that draws guards. Hold Shift to sneak past instead.']});
-  steps.push({tag:'READY',title:'Deploy',points:()=>['Security starts moving as soon as you press Start mission.',directory&&!directory.used?'First step: walk to the FLOOR DIRECTORY in this room and press E.':'Press R any time to point toward your next objective.']});
+   'Noise: dashing, thrown lures and shorted cameras all make noise that draws guards. Aim the cursor within 4 tiles and press Q to throw a lure. Hold Shift to sneak past instead.']});
+  steps.push({tag:'READY',title:'Deploy',points:()=>['Security starts moving as soon as you press Start mission.',directory&&!directory.used?'Explore the floor and find the FLOOR DIRECTORY, then press E to reveal the map.':'Press R any time to point toward your next objective.']});
   return steps;
  },
  objective(step){
   const point=missionPoint(step),room=point&&World.roomAt(world,point),notes=[];
-  const where=room?room.name+' (room '+(room.id+1)+')':'somewhere on this floor';
+  const where=room?room.name:'somewhere on this floor';
   if(step==='card')return{title:'Cyan access card',summary:missionLabel(step),where,icon:'card',restricted:false,how:'The card is labelled ACCESS. Walk up to it and press E to take it. There is no puzzle.',brief:'Press E to take it. No puzzle.',notes:['It opens the striped OFF LIMITS archive door. The archive is still a restricted room.']};
   const names={route:'circuit',cables:'cable',breaker:'breaker',drawers:'filing cabinet'};
   const how=point.type?'Press E to start a '+names[point.type]+' puzzle. '+RoomActions.describe(point)+' You have '+RoomActions.timeLimit(point)+' seconds, and security keeps moving while you work. Press Escape to disconnect.':'Press E to use it. No puzzle. '+RoomActions.describe(point);

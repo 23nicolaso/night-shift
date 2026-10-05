@@ -53,8 +53,8 @@ function generate(seed,layoutOverride){
  const point=n=>({x:center(n).x+.5,y:center(n).y+.5}),publicRooms=rooms.filter(r=>!r.archive),other=archiveRoom.doors[0];
  const distances=new Map(),queue=[[Math.floor(other.x),Math.floor(other.y),0]];for(let i=0;i<queue.length;i++){const[x,y,d]=queue[i],key=x+','+y;if(distances.has(key))continue;distances.set(key,d);for(const[dx,dy]of dirs){const xx=x+dx,yy=y+dy;if(grid[yy]?.[xx]&&!distances.has(xx+','+yy))queue.push([xx,yy,d+1])}}
  const distance=r=>distances.get(Math.floor(r.cx)+','+Math.floor(r.cy))??-1;const startRoom=publicRooms.reduce((best,r)=>distance(r)>distance(best)?r:best,publicRooms[0]);world.start=point(startRoom.id);startRoom.type='lobby';startRoom.name='SERVICE LIFT';
- const choices=publicRooms.filter(r=>r.id!==startRoom.id).sort(()=>random()-.5),cardRoom=choices[0],powerRoom=choices[1],badgeRoom=choices[2];world.card=point(cardRoom.id);world.power=point(powerRoom.id);world.badge=point(badgeRoom.id);world.target=point(archive);cardRoom.name='ACCESS CONTROL';powerRoom.name='POWER CONTROL';badgeRoom.name='CONTRACTOR OFFICE';
- choices[3].restricted=true;choices[3].name='RESTRICTED LAB';
+ const choices=publicRooms.filter(r=>r.id!==startRoom.id).sort(()=>random()-.5),directoryRoom=choices[0],cardRoom=choices[1],powerRoom=choices[2],badgeRoom=choices[3];world.card=point(cardRoom.id);world.power=point(powerRoom.id);world.badge=point(badgeRoom.id);world.target=point(archive);directoryRoom.name='DIRECTORY ROOM';cardRoom.name='ACCESS CONTROL';powerRoom.name='POWER CONTROL';badgeRoom.name='CONTRACTOR OFFICE';
+ choices[4].restricted=true;choices[4].name='RESTRICTED LAB';
  for(const r of rooms.filter(r=>r.restricted))for(const entry of r.doors){const d={x:Math.floor(entry.x),y:Math.floor(entry.y),dx:entry.dx,dy:entry.dy,roomId:r.id,keyRequired:r.archive,open:false};world.doors.push(d);grid[d.y][d.x]=r.archive?2:4}
  // Cover lives off the central cross so every doorway and objective remains connected.
  const blocksDoor=(r,x,y,ww)=>r.doors.some(d=>d.dx&&Math.floor(d.y)===y||d.dy&&Math.floor(d.x)>=x&&Math.floor(d.x)<x+ww);
@@ -108,7 +108,7 @@ function generate(seed,layoutOverride){
  for(const r of choices.slice(3,6)){const entry=r.doors[0];if(!entry)continue;world.lasers.push({...entry,phase:random()*5,period:5,onTime:2.8})}
  world.edges=edges;
  world.stations=rooms.map(r=>{
-  let effect=r.archive?'archive':r.id===powerRoom.id?'power':r.restricted?'lasers':r.type==='lobby'?'map':r.type==='office'?'cameras':r.type==='records'?'intel':r.type==='server'?'cameras':r.type==='lounge'?'supplies':'tools';
+  let effect=r.archive?'archive':r.id===powerRoom.id?'power':r.restricted?'lasers':r.id===directoryRoom.id?'map':r.type==='office'?'cameras':r.type==='records'?'intel':r.type==='server'?'cameras':r.type==='lounge'?'supplies':'tools';
   const type=effect==='archive'?'cables':effect==='power'||effect==='lasers'?'breaker':effect==='intel'?'drawers':effect==='cameras'?(r.type==='server'?'cables':'route'):null;
   const primary=effect==='archive'||effect==='power',names={archive:'ENCRYPTED ARCHIVE',power:'POWER BREAKER',lasers:'LASER RELAY',map:'FLOOR DIRECTORY',cameras:r.type==='server'?'CAMERA PATCH BAY':'SECURITY LAPTOP',intel:'PATROL RECORDS',supplies:'DECOY SUPPLIES',tools:'TOOL BENCH'};
   return{id:r.id,roomId:r.id,x:r.cx+(primary?0:2),y:r.cy,effect,type,label:names[effect],sprite:effect==='intel'?'cabinet':effect==='supplies'?'supplies':effect==='tools'?'tools':effect==='power'||effect==='lasers'?'relay':'terminal',used:false,repeat:effect==='power'};
